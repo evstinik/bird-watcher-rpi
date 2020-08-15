@@ -1,0 +1,6 @@
+*.jpg
+frames
+examples
+upload_client.sh
+serviceAccountKey.json
+requirements.txt
