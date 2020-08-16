@@ -46,6 +46,8 @@ logger.info('Connecting to Firebase...')
 cred = credentials.Certificate(os.path.join(script_folder, 'serviceAccountKey.json'))
 firebase_admin.initialize_app(cred)
 firebaseDb = firestore.client()
+frames_ref = firebaseDb.collection('frames')
+stats_ref = firebaseDb.collection('stats')
 
 logger.info('Starting server...')
 
@@ -104,8 +106,14 @@ def applySSD(image):
             label = "{}: {:.2f}%".format(CLASSES[idx], confidence * 100)
             logger.info('#{}: {}'.format(i + 1, label))
             detections_out.append({
-                u'name': CLASSES[idx],
-                u'confidence': confidence.astype("float")
+                'name': CLASSES[idx],
+                'confidence': confidence.item(),
+                'bbox': {
+                    'startX': startX.item(),
+                    'endX': endX.item(),
+                    'startY': startY.item(),
+                    'endY': endY.item()
+                }
             })
             cv2.rectangle(image, (startX, startY), (endX, endY),
                 COLORS[idx], 2)
@@ -116,12 +124,25 @@ def applySSD(image):
 
 def deploy(image, detections):
     logger.debug('Deploying to firebase...')
+    # Convert to blob
     retval,blob = cv2.imencode('.jpg', image)
-    doc_ref = firebaseDb.collection(u'frames').add({
-        u'image': base64.b64encode(blob),
-        u'created_at': datetime.now().isoformat(),
-        u'classes': detections
+    now = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+    # Add entry
+    frames_ref.add({
+        'image': base64.b64encode(blob),
+        'created_at': now,
+        'classes': list(map(lambda d: d['name'], detections)),
+        'classes_detailed': detections
     })
+    # Update stats for today
+    today = now[:10]
+    if len(detections) > 0:
+        stats_ref.document(today).update(
+            dict(zip(
+                list(map(lambda d: d['name'], detections)),
+                [firestore.Increment(1)] * len(detections)
+            ))
+        )
     logger.debug('Deployed to firebase')
 
 logger.info('Ready')
@@ -135,11 +156,12 @@ try:
         logger.info('Received frame from {}'.format(rpiName))
         imageHub.send_reply(b'OK')
         # Start recognition
-        frame, detections = applySSD(frame)
+        _,detections = applySSD(frame)
         # Save frame
         #frame_name = '{}_{}.jpg'.format(rpiName, datetime.now().strftime("%y%m%d-%H%M%S.%f"))
         #cv2.imwrite('./frames/{}'.format(frame_name), frame)
         #logger.info("Saved frame to {}".format(frame_name))
+        # Deploying original frame only, not with frames
         deploy(frame, detections)
         
 except KeyboardInterrupt:
