@@ -1,0 +1,12 @@
+[Unit]
+Description=Bird Watcher Client
+After=network.target
+
+[Service]
+Type=idle
+User=pi
+Group=pi
+ExecStart=/usr/bin/python3 /home/pi/Documents/Projects/bird-watcher/client.py -s 192.168.0.227
+
+[Install]
+WantedBy=multi-user.target

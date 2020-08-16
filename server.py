@@ -11,6 +11,9 @@ import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import firestore
 import base64
+import os
+
+script_folder = os.path.dirname(os.path.realpath(__file__))
 
 def setup_custom_logger(name):
     formatter = logging.Formatter(fmt='%(asctime)s %(levelname)-8s %(message)s',
@@ -29,9 +32,9 @@ logger = setup_custom_logger('bird-watcher-server')
 
 # construct the argument parser and parse the arguments
 ap = argparse.ArgumentParser()
-ap.add_argument("-p", "--prototxt", default='../shared-libs/MobileNet-SSD/deploy.prototxt',
+ap.add_argument("-p", "--prototxt", default=os.path.join(script_folder, '../shared-libs/MobileNet-SSD/deploy.prototxt'),
     help="path to Caffe 'deploy' prototxt file")
-ap.add_argument("-m", "--model", default='../shared-libs/MobileNet-SSD/mobilenet_iter_73000.caffemodel',
+ap.add_argument("-m", "--model", default=os.path.join(script_folder, '../shared-libs/MobileNet-SSD/mobilenet_iter_73000.caffemodel'),
     help="path to Caffe pre-trained model")
 ap.add_argument("-c", "--confidence", type=float, default=0.2,
     help="minimum probability to filter weak detections")
@@ -40,7 +43,7 @@ args = vars(ap.parse_args())
 logger.info('Connecting to Firebase...')
 
 # initialize firebase
-cred = credentials.Certificate("./serviceAccountKey.json")
+cred = credentials.Certificate(os.path.join(script_folder, 'serviceAccountKey.json'))
 firebase_admin.initialize_app(cred)
 firebaseDb = firestore.client()
 
